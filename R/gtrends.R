@@ -245,76 +245,93 @@ as.zoo.gtrends <- function(x, ...) {
     meta  <- strsplit(vec[1], "\\\r\\\n")[[1]]
     
     ## block 2: trend
-    trend <- read.csv(textConnection(strsplit(vec[2], "\\\n")[[1]]),
-                      skip=1, stringsAsFactors=FALSE)
-    weeks <- do.call(rbind, strsplit(trend[,1], " - "))
     
-    if (dim(weeks)[2]==1) {
-      print("Substituting sparse Google Trends (monthly) with NA series")
+    tryCatch({
+      trend <- read.csv(textConnection(strsplit(vec[2], "\\\n")[[1]]),
+                        skip=1, stringsAsFactors=FALSE)
+      weeks <- do.call(rbind, strsplit(trend[,1], " - "))
+      
+      if (dim(weeks)[2]==1) {
+        print("Substituting sparse Google Trends (monthly) with NA series")
+        num.weekly.trend <- as.numeric((((Sys.Date() - as.POSIXlt(Sys.Date())$wday + 6) - as.Date("2004-01-10",format="%Y-%m-%d"))/7)+1)
+        enddates = seq(to=(Sys.Date() - as.POSIXlt(Sys.Date())$wday + 6),from=as.Date("2004-01-10",format="%Y-%m-%d"),by=7)
+        trend <- data.frame(start=enddates-6, end=enddates, trend=rep(NA,num.weekly.trend))
+        names(trend) = c("start","end",tolower(query))
+      } else if (dim(weeks)[2] > 1) {
+        trend <- data.frame(start=as.Date(weeks[,1], format='%Y-%m-%d'),
+                            end=as.Date(weeks[,2], format='%Y-%m-%d'),
+                            trend)
+        trend <- trend[is.finite(trend[,4]), -3] # check results column for NA, exclude old (unparsed) time column  
+      }
+     
+      ## first set of blocks: top regions
+      regidx <- grep("Top (sub)?regions", headers)
+      reglist <- lapply(regidx, function(i) read.csv(textConnection(strsplit(vec[i], "\\\n")[[1]]),
+                                                     skip=1, stringsAsFactors=FALSE))
+  
+      ## next (optional, if geo==US) block 
+      if (queryparams["geo"] == "US") {
+          metidx <- grep("Top metros", headers)
+          metlist <- lapply(metidx, function(i) read.csv(textConnection(strsplit(vec[i], "\\\n")[[1]]),
+                                                         skip=1, stringsAsFactors=FALSE))
+      } else {
+          metlist <- NULL
+      }
+      
+      ## next block: top cities
+      citidx <- grep("Top cities", headers)
+      citlist <- lapply(citidx, function(i) read.csv(textConnection(strsplit(vec[i], "\\\n")[[1]]),
+                                                     skip=1, stringsAsFactors=FALSE))
+      
+      ## next block: top searches
+      schidx <- grep("Top searches", headers)
+      schlist <- lapply(schidx, function(i) read.csv(textConnection(strsplit(vec[i], "\\\n")[[1]]),
+                                                     skip=1, stringsAsFactors=FALSE, header=FALSE))
+      if (length(schlist) > 0) {  
+        ## Set columns names
+        schlist <- lapply(1:length(schidx), function(i) {
+          names(schlist[[i]]) = c(headers[schidx][i], "Hits") 
+          schlist[[i]]
+        })
+      }
+      
+      ## nex block: rising searches
+      risidx <- grep("Rising searches", headers)
+      rislist <- lapply(risidx, function(i) {
+          ## broken by design: not a csv when a field can be "+1,900%" with a comma as
+          ## a decimal separator -- so subst out the first comma into a semicolon
+          tt <- sub(",", ";", strsplit(vec[i], "\\\n")[[1]])
+          rising <- read.csv(textConnection(tt),
+                             sep=";", skip=1, header=FALSE,
+                             col.names=c("term", "change"),
+                             stringsAsFactors=FALSE)
+          rising
+      })
+  
+      res <- list(query=queryparams,
+                  meta=meta,
+                  trend=trend,
+                  regions=reglist,
+                  topmetros=metlist,
+                  cities=citlist,
+                  searches=schlist,
+                  rising=rislist,
+                  headers=headers)
+    }, error = function(e) {
       num.weekly.trend <- as.numeric((((Sys.Date() - as.POSIXlt(Sys.Date())$wday + 6) - as.Date("2004-01-10",format="%Y-%m-%d"))/7)+1)
       enddates = seq(to=(Sys.Date() - as.POSIXlt(Sys.Date())$wday + 6),from=as.Date("2004-01-10",format="%Y-%m-%d"),by=7)
       trend <- data.frame(start=enddates-6, end=enddates, trend=rep(NA,num.weekly.trend))
-      names(trend) = c("start","end",strsplit(headers[3]," ")[[1]][length(strsplit(headers[3]," ")[[1]])])
-    } else if (dim(weeks)[2] > 1) {
-      trend <- data.frame(start=as.Date(weeks[,1], format='%Y-%m-%d'),
-                          end=as.Date(weeks[,2], format='%Y-%m-%d'),
-                          trend)
-      trend <- trend[is.finite(trend[,4]), -3] # check results column for NA, exclude old (unparsed) time column  
+      names(trend) = c("start","end",tolower(query))
+      res <- list(query=queryparams,
+                  meta=meta,
+                  trend=trend,
+                  regions=list(),
+                  topmetros=NULL,
+                  cities=list(),
+                  searches=list(),
+                  rising=list(),
+                  headers=headers)
     }
-   
-    ## first set of blocks: top regions
-    regidx <- grep("Top (sub)?regions", headers)
-    reglist <- lapply(regidx, function(i) read.csv(textConnection(strsplit(vec[i], "\\\n")[[1]]),
-                                                   skip=1, stringsAsFactors=FALSE))
-
-    ## next (optional, if geo==US) block 
-    if (queryparams["geo"] == "US") {
-        metidx <- grep("Top metros", headers)
-        metlist <- lapply(metidx, function(i) read.csv(textConnection(strsplit(vec[i], "\\\n")[[1]]),
-                                                       skip=1, stringsAsFactors=FALSE))
-    } else {
-        metlist <- NULL
-    }
-    
-    ## next block: top cities
-    citidx <- grep("Top cities", headers)
-    citlist <- lapply(citidx, function(i) read.csv(textConnection(strsplit(vec[i], "\\\n")[[1]]),
-                                                   skip=1, stringsAsFactors=FALSE))
-    
-    ## next block: top searches
-    schidx <- grep("Top searches", headers)
-    schlist <- lapply(schidx, function(i) read.csv(textConnection(strsplit(vec[i], "\\\n")[[1]]),
-                                                   skip=1, stringsAsFactors=FALSE, header=FALSE))
-    if (length(schlist) > 0) {  
-      ## Set columns names
-      schlist <- lapply(1:length(schidx), function(i) {
-        names(schlist[[i]]) = c(headers[schidx][i], "Hits") 
-        schlist[[i]]
-      })
-    }
-    
-    ## nex block: rising searches
-    risidx <- grep("Rising searches", headers)
-    rislist <- lapply(risidx, function(i) {
-        ## broken by design: not a csv when a field can be "+1,900%" with a comma as
-        ## a decimal separator -- so subst out the first comma into a semicolon
-        tt <- sub(",", ";", strsplit(vec[i], "\\\n")[[1]])
-        rising <- read.csv(textConnection(tt),
-                           sep=";", skip=1, header=FALSE,
-                           col.names=c("term", "change"),
-                           stringsAsFactors=FALSE)
-        rising
-    })
-
-    res <- list(query=queryparams,
-                meta=meta,
-                trend=trend,
-                regions=reglist,
-                topmetros=metlist,
-                cities=citlist,
-                searches=schlist,
-                rising=rislist,
-                headers=headers)
     class(res) <- "gtrends"
     return(res)
 }
