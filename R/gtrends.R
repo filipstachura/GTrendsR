@@ -234,9 +234,9 @@ as.zoo.gtrends <- function(x, ...) {
     vec <- strsplit(resultsText, "\\\n{2,}")[[1]]
     
     ## Make sure there are some results have been returned.
-    if (length(vec) < 6) {
-        stop("Not enough search volume. Please change your search terms.", call. = FALSE)
-    }
+#     if (length(vec) < 6) {
+#         stop("Not enough search volume. Please change your search terms.", call. = FALSE)
+#     }
 
     ## results headers -- for 'geo="US"' and three terms, we get 17 results (!!)
     headers <- unname(sapply(vec, function(v) strsplit(v, "\\\n")[[1]][1]))
@@ -285,13 +285,13 @@ as.zoo.gtrends <- function(x, ...) {
     schidx <- grep("Top searches", headers)
     schlist <- lapply(schidx, function(i) read.csv(textConnection(strsplit(vec[i], "\\\n")[[1]]),
                                                    skip=1, stringsAsFactors=FALSE, header=FALSE))
-  
-    ## Set columns names
-    schlist <- lapply(1:length(schidx), function(i) {
-      names(schlist[[i]]) = c(headers[schidx][i], "Hits") 
-      schlist[[i]]
-    })
-    
+    if (length(schlist) > 0) {  
+      ## Set columns names
+      schlist <- lapply(1:length(schidx), function(i) {
+        names(schlist[[i]]) = c(headers[schidx][i], "Hits") 
+        schlist[[i]]
+      })
+    }
     
     ## nex block: rising searches
     risidx <- grep("Rising searches", headers)
