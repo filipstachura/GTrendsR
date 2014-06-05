@@ -248,8 +248,8 @@ as.zoo.gtrends <- function(x, ...) {
     trend <- read.csv(textConnection(strsplit(vec[2], "\\\n")[[1]]),
                       skip=1, stringsAsFactors=FALSE)
     weeks <- do.call(rbind, strsplit(trend[,1], " - "))
-    trend <- data.frame(start=as.Date(weeks[,1]),
-                        end=as.Date(weeks[,2]),
+    trend <- data.frame(start=as.Date(weeks[,1], format='%Y-%m-%d'),
+                        end=as.Date(weeks[,2], format='%Y-%m-%d'),
                         trend)
     trend <- trend[is.finite(trend[,4]), -3] # check results column for NA, exclude old (unparsed) time column
    
