@@ -318,6 +318,7 @@ as.zoo.gtrends <- function(x, ...) {
                   rising=rislist,
                   headers=headers)
     } else {
+      print(paste("No Trends data for",query,"- substituting NA series...")
       num.weekly.trend <- as.numeric((((Sys.Date() - as.POSIXlt(Sys.Date())$wday + 6) - as.Date("2004-01-10",format="%Y-%m-%d"))/7)+1)
       enddates = seq(to=(Sys.Date() - as.POSIXlt(Sys.Date())$wday + 6),from=as.Date("2004-01-10",format="%Y-%m-%d"),by=7)
       trend <- data.frame(start=enddates-6, end=enddates, trend=rep(NA,num.weekly.trend))
