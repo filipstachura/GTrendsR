@@ -331,7 +331,7 @@ as.zoo.gtrends <- function(x, ...) {
                   searches=list(),
                   rising=list(),
                   headers=headers)
-    }
+    })
     class(res) <- "gtrends"
     return(res)
 }
