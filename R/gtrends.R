@@ -246,7 +246,7 @@ as.zoo.gtrends <- function(x, ...) {
     
     ## block 2: trend
     
-    tryCatch({
+    if (length(headers)>1) {
       trend <- read.csv(textConnection(strsplit(vec[2], "\\\n")[[1]]),
                         skip=1, stringsAsFactors=FALSE)
       weeks <- do.call(rbind, strsplit(trend[,1], " - "))
@@ -317,7 +317,7 @@ as.zoo.gtrends <- function(x, ...) {
                   searches=schlist,
                   rising=rislist,
                   headers=headers)
-    }, error = function(e) {
+    } else {
       num.weekly.trend <- as.numeric((((Sys.Date() - as.POSIXlt(Sys.Date())$wday + 6) - as.Date("2004-01-10",format="%Y-%m-%d"))/7)+1)
       enddates = seq(to=(Sys.Date() - as.POSIXlt(Sys.Date())$wday + 6),from=as.Date("2004-01-10",format="%Y-%m-%d"),by=7)
       trend <- data.frame(start=enddates-6, end=enddates, trend=rep(NA,num.weekly.trend))
@@ -331,7 +331,7 @@ as.zoo.gtrends <- function(x, ...) {
                   searches=list(),
                   rising=list(),
                   headers=headers)
-    })
+    }
     class(res) <- "gtrends"
     return(res)
 }
