@@ -4,7 +4,7 @@
 ##  Description:    TODO
 ##-----------------------------------------------------------------------------
 
-## TODO: 
+## TODO:
 # - better authentication success checks
 # - better query result checks
 # - adding category code (as you mentioned)
@@ -25,17 +25,17 @@ gconnect <- function(usr=NULL, psw=NULL, verbose=FALSE) {
         if (getOption("google.password") != "") psw <- getOption("google.password")
         if (is.null(psw)) stop("No Google password supplied.", call. = FALSE)
     }
-    
+
     ch <- getCurlHandle()
-    
+
     ans <- curlSetOpt(curl = ch,
                       ssl.verifypeer = FALSE,
                       useragent = getOption('HTTPUserAgent', "R"),
-                      timeout = 60,         
+                      timeout = 60,
                       followlocation = TRUE,
                       cookiejar = "./cookies",
                       cookiefile = "")
-  
+
     galx <- .getGALX(ch)
     formparams <-list(Email=usr,
                       Passwd=psw,
@@ -43,28 +43,28 @@ gconnect <- function(usr=NULL, psw=NULL, verbose=FALSE) {
                       PersistentCookie= "yes",
                       continue = "http://www.google.com/trends")
     authenticatePage <- postForm(authenticateURL, .params=formparams, curl=ch)
-  
+
     authenticatePage2 <- getURL("http://www.google.com", curl = ch)
-  
+
     if (getCurlInfo(ch)$response.code == 200) {
         if (verbose) cat("Google login successful!\n")
     } else {
         if (verbose) cat("Google login failed!")
     }
     return(ch)
-  
+
 }
 
 ## This gets the GALX cookie which we need to pass back in the login form we post.
 .getGALX <- function(curl) {
     txt <- basicTextGatherer()
-    curlPerform(url = "https://accounts.google.com/accounts/ServiceLogin", 
+    curlPerform(url = "https://accounts.google.com/accounts/ServiceLogin",
                 curl = curl, writefunction = txt$update, header = TRUE, ssl.verifypeer = FALSE)
     tmp <- txt$value()
-  
+
     val <- grep("Cookie: GALX", strsplit(tmp, "\n")[[1]], value = TRUE)
     strsplit(val, "[:=;]")[[1]][3]
-  
+
     return(strsplit(val, "[:=;]")[[1]][3])
 }
 
@@ -106,7 +106,7 @@ gtrends.default <- function(ch, query, geo = 'all', cat = "0", ...) {
     if (inherits(ch, "CURLHandle") != TRUE) {
         stop("'ch' arguments has to be result from 'gconnect()'.", call. = FALSE)
     }
-    
+
     ## Make sure a valid country code has been specified.
     #rm(countries)
     data(countries)
@@ -114,23 +114,23 @@ gtrends.default <- function(ch, query, geo = 'all', cat = "0", ...) {
     countries[,1] <- as.character(countries[,1])
     countries[,2] <- as.character(countries[,2])
     countries[ which(countries[,"COUNTRY"]=="Namibia"),"CODE"] <- "NA"
-    
+
     if (geo != "all" && !geo %in% countries[,"CODE"]) {
         stop("Country code not valid. Please use 'data(countries)' to retreive valid codes.",
-             call. = FALSE) 
+             call. = FALSE)
     }
-  
+
     authenticatePage2 <- getURL("http://www.google.com", curl = ch)
-    
+
     trendsURL <- "http://www.google.com/trends/?"
 
     pp <- list(q = query, geo = geo, cat = cat, content = 1, export = 1, graph = 'all_csv')
-  
+
     resultsText <- getForm(trendsURL, .params = pp, curl = ch)
-  
+
     ## Sometimes we reach quota limit, in that case stop!
     if (any(grep("QUOTA", resultsText))) {
-        stop("Reached Google Trends quota limit! Please try again later.") 
+        stop("Reached Google Trends quota limit! Please try again later.")
     }
 
     ## log query, geo, cat and current time
@@ -227,12 +227,12 @@ as.zoo.gtrends <- function(x, ...) {
 
 ## TODO: If geo is "US" there will be 7 blocs and they won't match the current structure.
 ##       This happen because block 4 is "Top metros" which is only available when geo = "US".
-## 
+##
 
 .processResults <- function(resultsText, queryparams) {
 
     vec <- strsplit(resultsText, "\\\n{2,}")[[1]]
-    
+
     ## Make sure there are some results have been returned.
 #     if (length(vec) < 6) {
 #         stop("Not enough search volume. Please change your search terms.", call. = FALSE)
@@ -240,36 +240,36 @@ as.zoo.gtrends <- function(x, ...) {
 
     ## results headers -- for 'geo="US"' and three terms, we get 17 results (!!)
     headers <- unname(sapply(vec, function(v) strsplit(v, "\\\n")[[1]][1]))
-    
+
     ## block 1: meta data
     meta  <- strsplit(vec[1], "\\\r\\\n")[[1]]
-    
+
     ## block 2: trend
-    
+
     if (length(headers)>1) {
       trend <- read.csv(textConnection(strsplit(vec[2], "\\\n")[[1]]),
                         skip=1, stringsAsFactors=FALSE)
       weeks <- do.call(rbind, strsplit(trend[,1], " - "))
-      
+
       if (dim(weeks)[2]==1) {
         print("Substituting sparse Google Trends (monthly) with NA series")
         num.weekly.trend <- as.numeric((((Sys.Date() - as.POSIXlt(Sys.Date())$wday + 6) - as.Date("2004-01-10",format="%Y-%m-%d"))/7)+1)
         enddates = seq(to=(Sys.Date() - as.POSIXlt(Sys.Date())$wday + 6),from=as.Date("2004-01-10",format="%Y-%m-%d"),by=7)
         trend <- data.frame(start=enddates-6, end=enddates, trend=rep(NA,num.weekly.trend))
-        names(trend) = c("start","end",tolower(query))
+        names(trend) = c("start","end",tolower(queryparams["query"]))
       } else if (dim(weeks)[2] > 1) {
         trend <- data.frame(start=as.Date(weeks[,1], format='%Y-%m-%d'),
                             end=as.Date(weeks[,2], format='%Y-%m-%d'),
                             trend)
-        trend <- trend[is.finite(trend[,4]), -3] # check results column for NA, exclude old (unparsed) time column  
+        trend <- trend[is.finite(trend[,4]), -3] # check results column for NA, exclude old (unparsed) time column
       }
-     
+
       ## first set of blocks: top regions
       regidx <- grep("Top (sub)?regions", headers)
       reglist <- lapply(regidx, function(i) read.csv(textConnection(strsplit(vec[i], "\\\n")[[1]]),
                                                      skip=1, stringsAsFactors=FALSE))
-  
-      ## next (optional, if geo==US) block 
+
+      ## next (optional, if geo==US) block
       if (queryparams["geo"] == "US") {
           metidx <- grep("Top metros", headers)
           metlist <- lapply(metidx, function(i) read.csv(textConnection(strsplit(vec[i], "\\\n")[[1]]),
@@ -277,24 +277,24 @@ as.zoo.gtrends <- function(x, ...) {
       } else {
           metlist <- NULL
       }
-      
+
       ## next block: top cities
       citidx <- grep("Top cities", headers)
       citlist <- lapply(citidx, function(i) read.csv(textConnection(strsplit(vec[i], "\\\n")[[1]]),
                                                      skip=1, stringsAsFactors=FALSE))
-      
+
       ## next block: top searches
       schidx <- grep("Top searches", headers)
       schlist <- lapply(schidx, function(i) read.csv(textConnection(strsplit(vec[i], "\\\n")[[1]]),
                                                      skip=1, stringsAsFactors=FALSE, header=FALSE))
-      if (length(schlist) > 0) {  
+      if (length(schlist) > 0) {
         ## Set columns names
         schlist <- lapply(1:length(schidx), function(i) {
-          names(schlist[[i]]) = c(headers[schidx][i], "Hits") 
+          names(schlist[[i]]) = c(headers[schidx][i], "Hits")
           schlist[[i]]
         })
       }
-      
+
       ## nex block: rising searches
       risidx <- grep("Rising searches", headers)
       rislist <- lapply(risidx, function(i) {
@@ -307,7 +307,7 @@ as.zoo.gtrends <- function(x, ...) {
                              stringsAsFactors=FALSE)
           rising
       })
-  
+
       res <- list(query=queryparams,
                   meta=meta,
                   trend=trend,
