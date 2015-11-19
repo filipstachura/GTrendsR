@@ -253,7 +253,7 @@ as.zoo.gtrends <- function(x, ...) {
 
       if (dim(weeks)[2]==1) {
         print("Substituting sparse Google Trends (monthly) with replicated values")
-        enddates = seq(to=(Sys.Date() - as.POSIXlt(Sys.Date())$wday + 6),from=as.Date("2004-01-10",format="%Y-%m-%d"),by=7)
+        enddates = seq(to=(Sys.Date() - as.POSIXlt(Sys.Date())$wday - 1),from=as.Date("2004-01-10",format="%Y-%m-%d"),by=7)
         trend <- data.frame(start=enddates-6, end=enddates, trend=trend[match(format(enddates, "%Y-%m"), trend$Month),2])
         names(trend) = c("start","end",tolower(queryparams["query"]))
       } else if (dim(weeks)[2] > 1) {
